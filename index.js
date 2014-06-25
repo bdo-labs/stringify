@@ -2,16 +2,16 @@
 /**
  * Module dependencies.
  */
-var through = require('through');
-var stringify = require('string-to-js');
+var fs = require('fs');
+var quote = require('quote-stream');
+var through = require('through2');
 
 /**
- * Creates the
- * @param   {object | array}    options
- * @param   {object}            options.extensions
- * @returns {stream}
+ * @param   {String}    file
+ * @param   {Object}    options
+ * @returns {Stream}
  */
-module.exports = function(options) {
+module.exports = function(file, options) {
 
   /**
    * The file extensions of file which should be stringified
@@ -35,8 +35,8 @@ module.exports = function(options) {
 
   /**
    * Returns whether the file ends in an extension
-   * @param   {string} file
-   * @return  {boolean}
+   * @param   {String} file
+   * @return  {Boolean}
    */
   function has_stringify_extension(file) {
     for (var i=0; i<extensions.length; ++i) {
@@ -47,30 +47,39 @@ module.exports = function(options) {
     return false;
   }
 
+  if (!has_stringify_extension(file)) {
+    return through();
+  }
+
   /**
-   * The browserify transform method
-   * @param   {string} file
-   * @returns {stream}
+   * Modify content and add to stream.
+   * @param {Buffer} buffer
+   * @param {String} encoding
+   * @param {Function} next
    */
-  function transform(file) {
-    var content = '';
+  function write(buffer, enc, next) {
+    var str = new String(buffer)
+      .replace(/'/g, "\\'")
+      .replace(/\r\n|\r|\n/g, "\\n");
+    this.push(str);
+    next();
+  }
 
-    if (!has_stringify_extension(file)) {
-      return through();
-    }
+  /**
+   * Close require-call and iterate to next.
+   * @param {Function} next
+   */
+  function end(next) {
+    this.push("';");
+    this.push(null);
+    next();
+  }
 
-    function write(buffer) {
-      content += buffer;
-    }
+  var stream = through(write, end);
+  stream.push("module.exports = '");
+  var handle = fs.createReadStream(file, {encoding: 'utf-8'})
+    .pipe(quote()).pipe(stream);
 
-    function end() {
-      this.queue(stringify(content));
-      this.queue(null);
-    }
-
-    return through(write, end);
-  };
-
-  return transform;
+  return handle;
 };
 
