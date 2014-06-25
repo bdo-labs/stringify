@@ -1,6 +1,7 @@
 # Stringify #
 
 Browserify plugin to require() text files (like templates) inside of your client-side JavaScript files.
+Added support for browserify 3.x, parcelify and cartero
 
 ## Installation ##
 
